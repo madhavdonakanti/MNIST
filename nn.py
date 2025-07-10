@@ -66,17 +66,7 @@ Yv=Yv.T
 
 
 
-
-#training
-epochs=500
-alpha=0.1 #learning rate 
-costs=[]
-costsv=[]  #for validation
-
-for i in range(epochs):
-
-
-    #feed forward
+def feedforward(A0,listweights,listbiases,L):
     listpreac=[0]*L
     listafac=[0]*L
 
@@ -87,38 +77,47 @@ for i in range(epochs):
         listafac[j]=actf(listpreac[j])
 
     listafac[L-1]=sp.special.softmax(listpreac[L-1],axis=0)
+    
+    return listpreac, listafac
 
+def costcalc(Y,listafac,m):
     #calculating cost using categorical cross entropy loss function. 
     losses=np.sum(-1*Y*np.log(listafac[L-1]),axis=0, keepdims=True) #basically doing -y*log(yhat) for each element in the matrix after softmax activation and then summing along the columns to get the loss for each sample. losses should be a 1 by 60000 matrix. we use * because we want corresponding elementwise multiplication and not matrix multiplication
 
     cost = (1/m)*np.sum(losses) #cost is average loss over all the samples
+    #calculating cost using Mean squared error is to be used only in regression scenario ie when there is only one node in the final output layer which is supposed to predict/print the number in the image
+    return cost
 
-    #calculating cost using Mean squared error, to be used only in regression scenario ie when there is only one node in the final output layer which is supposed to predict/print the number in the image
+
+
+
+
+#training
+epochs=500
+alpha=0.1 #learning rate 
+costs=[] #to store the cost for each epoch
+costsv=[] #to store the cost for each epoch for validation set
+
+for i in range(epochs):
+
+
+    #feed forward
+    listpreac,listafac=feedforward(A0,listweights,listbiases,L)
+
+    #calculating cost
+    cost=costcalc(Y,listafac,m)
+
     costs.append(cost)
 
 
 
-
     #feed forward for validation
-    listpreacv=[0]*L
-    listafacv=[0]*L
+    listpreacv,listafacv=feedforward(A0v,listweights,listbiases,L)
 
-    listpreacv[0]=listweights[0]@A0v + listbiases[0]
-    listafacv[0]=actf(listpreacv[0])
-    for j in range(1,L):
-        listpreacv[j]=listweights[j]@listafacv[j-1] + listbiases[j]
-        listafacv[j]=actf(listpreacv[j])
+    #calculating cost
+    costv=costcalc(Yv,listafacv,v)
 
-    listafacv[L-1]=sp.special.softmax(listpreacv[L-1],axis=0)
-
-    #calculating cost using categorical cross entropy loss function. 
-    lossesv=np.sum(-1*Yv*np.log(listafacv[L-1]),axis=0, keepdims=True) #basically doing -y*log(yhat) for each element in the matrix after softmax activation and then summing along the columns to get the loss for each sample. losses should be a 1 by 60000 matrix. we use * because we want corresponding elementwise multiplication and not matrix multiplication
-
-    costv = (1/v)*np.sum(lossesv) #cost is average loss over all the samples
-
-    #calculating cost using Mean squared error, to be used only in regression scenario ie when there is only one node in the final output layer which is supposed to predict/print the number in the image
     costsv.append(costv)
-
 
 
 
@@ -174,3 +173,16 @@ plt.plot(range(epochs),costsv)
 
 
 
+
+
+#outputing predictions for test.csv
+df_test=pd.read_csv('test.csv')
+inpt=df_test.to_numpy()
+A0t=inpt.T 
+
+#feed forward
+listpreact,listafact=feedforward(A0t,listweights,listbiases,L)
+
+predictions=np.argmax(listafact[L-1], axis=0)
+submission_df=pd.DataFrame({'ImageId': range(1,len(predictions)+1),'Label': predictions})
+submission_df.to_csv('submission.csv', index=False)
