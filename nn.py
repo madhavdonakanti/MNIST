@@ -4,7 +4,9 @@ import scipy as sp
 import matplotlib.pyplot as plt
 
 m=36000 #number of training samples, m is used to calculate the average cost and also in backpropogation to calculate the gradients
-v=6000 #number of validation samples, v is used to calculate the average cost and also in backpropogation to calculate the gradients
+v=6000 #number of validation samples
+activation_function='sigmoid'   #can be 'sigmoid', 'relu' or 'tanh'. change accordingly 
+
 
 #loading csv as a panda df and separating input columns from output columns 
 df = pd.read_csv('train.csv')
@@ -34,14 +36,27 @@ for i in range(L):
     listweights[i]=np.random.randn(n[i+1],n[i])
     listbiases[i]=np.random.randn(n[i+1],1)
 
-#activation functions 
+#activation functions and their derivatives
 def actf(z):
-    return 1 / (1 + np.exp(-1 * z)) #sig
-   #return                         #ReLu
-
+    if activation_function=='sigmoid':
+        return 1 / (1 + np.exp(-1 * z))
+    elif activation_function=='relu':
+        return np.maximum(0, z)
+    elif activation_function=='tanh':
+        return np.tanh(z)
+    else:
+        print("Invalid activation function. Choose 'sigmoid', 'relu', or 'tanh'")
+        quit()
+ 
 #can code softmax but will require a time consuming loop(for the column wise summations) or multiple numpy statements with broadcasting 
-#def smax(z):
- #   return np.exp(z)/np.sum(np.exp(z))
+
+def actf_derivative(z):
+    if activation_function=='sigmoid':
+        return z*(1-z) 
+    elif activation_function=='relu':
+        return np.where(z>0,1,0)
+    elif activation_function=='tanh':
+        return 1-z**2
 
 
 
@@ -81,8 +96,10 @@ def feedforward(A0,listweights,listbiases,L):
     return listpreac, listafac
 
 def costcalc(Y,listafac,m):
-    #calculating cost using categorical cross entropy loss function. 
-    losses=np.sum(-1*Y*np.log(listafac[L-1]),axis=0, keepdims=True) #basically doing -y*log(yhat) for each element in the matrix after softmax activation and then summing along the columns to get the loss for each sample. losses should be a 1 by 60000 matrix. we use * because we want corresponding elementwise multiplication and not matrix multiplication
+    #calculating cost using categorical cross entropy loss function.
+    y_hat_clipped = np.clip(listafac[L-1], 1e-15, 1 - 1e-15)  #clipping to avoid log(0) which is undefined and log(1) to prevent overfitting/overconfidence
+ 
+    losses=np.sum(-1*Y*np.log(y_hat_clipped),axis=0, keepdims=True) #basically doing -y*log(yhat) for each element in the matrix after softmax activation and then summing along the columns to get the loss for each sample. losses should be a 1 by 60000 matrix. we use * because we want corresponding elementwise multiplication and not matrix multiplication
 
     cost = (1/m)*np.sum(losses) #cost is average loss over all the samples
     #calculating cost using Mean squared error is to be used only in regression scenario ie when there is only one node in the final output layer which is supposed to predict/print the number in the image
@@ -142,7 +159,7 @@ for i in range(epochs):
     bigrads[L-1]=dc_dbL
 
     for k in range(L-1):
-        dc_dzl=dc_dal*(listafac[L-2-k]*(1-listafac[L-2-k]))
+        dc_dzl=dc_dal*actf_derivative(listafac[L-2-k])
         assert dc_dzl.shape==(n[L-1-k],m)
         if L-3-k >= 0:
             dzl_dwl = listafac[L-3-k]
