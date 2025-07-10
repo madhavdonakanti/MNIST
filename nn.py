@@ -2,24 +2,27 @@ import pandas as pd
 import numpy as np  
 import scipy as sp
 import matplotlib.pyplot as plt
+
+m=36000 #number of training samples, m is used to calculate the average cost and also in backpropogation to calculate the gradients
+v=6000 #number of validation samples, v is used to calculate the average cost and also in backpropogation to calculate the gradients
+
 #loading csv as a panda df and separating input columns from output columns 
 df = pd.read_csv('train.csv')
-indf=df.drop(df.columns[0], axis=1)
-outdf=df.iloc[0:,:1]
+indf=df.iloc[0:m,1:]  #leaving 6000 samples for validation
+outdf=df.iloc[0:m,:1]
 
 #converting to matrices
 inp=indf.to_numpy()
 out=outdf.to_numpy()
 
-Y=np.zeros((42000,10))
-for i in range(0,42000):
+Y=np.zeros((m,10))
+for i in range(0,m):
     num=out[i][0]
     Y[i][num]=1
 
 #transposing so dimensions are correct when feeding forward 
 A0=inp.T 
 Y=Y.T 
-m=42000
 
 #initialising weights and biases where L is number of layers(excluding input layer) and n contains no. of neurons in each layer
 L = 4
@@ -40,10 +43,35 @@ def actf(z):
 #def smax(z):
  #   return np.exp(z)/np.sum(np.exp(z))
 
+
+
+
+#some prerequisites for testing/cross validation
+indfv=df.iloc[m:,1:] 
+outdfv=df.iloc[m:,:1]
+
+#converting to matrices
+inpv=indfv.to_numpy()
+outv=outdfv.to_numpy()
+
+Yv=np.zeros((v,10))
+for i in range(0,v):
+    num=outv[i][0]
+    Yv[i][num]=1
+
+#transposing so dimensions are correct when feeding forward 
+A0v=inpv.T 
+Yv=Yv.T
+
+
+
+
+
 #training
-epochs=1000
-alpha=0.01 #learning rate 
+epochs=500
+alpha=0.1 #learning rate 
 costs=[]
+costsv=[]  #for validation
 
 for i in range(epochs):
 
@@ -67,6 +95,31 @@ for i in range(epochs):
 
     #calculating cost using Mean squared error, to be used only in regression scenario ie when there is only one node in the final output layer which is supposed to predict/print the number in the image
     costs.append(cost)
+
+
+
+
+    #feed forward for validation
+    listpreacv=[0]*L
+    listafacv=[0]*L
+
+    listpreacv[0]=listweights[0]@A0v + listbiases[0]
+    listafacv[0]=actf(listpreacv[0])
+    for j in range(1,L):
+        listpreacv[j]=listweights[j]@listafacv[j-1] + listbiases[j]
+        listafacv[j]=actf(listpreacv[j])
+
+    listafacv[L-1]=sp.special.softmax(listpreacv[L-1],axis=0)
+
+    #calculating cost using categorical cross entropy loss function. 
+    lossesv=np.sum(-1*Yv*np.log(listafacv[L-1]),axis=0, keepdims=True) #basically doing -y*log(yhat) for each element in the matrix after softmax activation and then summing along the columns to get the loss for each sample. losses should be a 1 by 60000 matrix. we use * because we want corresponding elementwise multiplication and not matrix multiplication
+
+    costv = (1/v)*np.sum(lossesv) #cost is average loss over all the samples
+
+    #calculating cost using Mean squared error, to be used only in regression scenario ie when there is only one node in the final output layer which is supposed to predict/print the number in the image
+    costsv.append(costv)
+
+
 
 
 
@@ -112,12 +165,12 @@ for i in range(epochs):
     for p in range(L):
         listweights[p]=listweights[p]-(alpha*wegrads[p])
         listbiases[p]=listbiases[p]-(alpha*bigrads[p])
-    print(costs)
+    if i%50==0:
+      print(costs[i])
+      print(costsv[i])
 
-plt.plot(costs,range(epochs))
-
-
-
+plt.plot(range(epochs),costs)
+plt.plot(range(epochs),costsv)
 
 
 
